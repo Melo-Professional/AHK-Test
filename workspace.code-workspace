@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"qct.buttons": [],
+        "files.exclude": {
+            "**/.versions": true
+        },
+        "search.exclude": {
+            "**/.versions": true
+        },
+        "files.watcherExclude": {
+            "**/.versions/**": true
+        }
+	}
+}
