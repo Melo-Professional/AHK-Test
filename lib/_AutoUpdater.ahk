@@ -193,7 +193,7 @@ class AutoUpdater {
         targetFile := A_ScriptFullPath
         targetDir := A_ScriptDir
         
-        Global updatesDir := targetDir . "\." . A_ScriptName . " updates"
+        Global updatesDir := targetDir . "\." . A_ScriptName . "_updates"
         
         if !DirExist(updatesDir)
             DirCreate(updatesDir)

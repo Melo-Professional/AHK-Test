@@ -5,12 +5,12 @@
  * @author Melo (melo@meloprofessional.com)
  * @date 2026/08/08
  * @releasedate 2026/04/24
- * @version 1.1.0.126
+ * @version 1.1.0.127
  ***********************************************************************/
 
 AppName := "Updater"
 ;@Ahk2Exe-Let U_AppName = %A_PriorLine%
-AppVersion := "1.1.0.126"
+AppVersion := "1.1.0.128"
 ;@Ahk2Exe-Let U_Version = %A_PriorLine%
 AppDescription := "This is an auto updater for projects."
 ;@endregion
