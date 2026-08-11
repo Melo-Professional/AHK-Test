@@ -1,8 +1,8 @@
 /************************************************************************
  * @description Autod Updater
  * @author Melo (melo@meloprofessional.com)
- * @date 2026/08/08
- * @version 1.4.0
+ * @date 2026/08/10
+ * @version 1.5.0
  ************************************************************************/
 
 #Requires AutoHotkey v2.0
@@ -316,12 +316,6 @@ class AutoUpdater {
         MyGui.SetFont("s" Settings.GuiFontSizeMedium, Settings.GuiFontName)
         offset := 10
 
-        UseAcrylicGUI := false
-        if IsFunctionDefined("FrostedTheme") {
-            UseAcrylicGUI := true
-            offset := 50
-        }
-
         if IsFunctionDefined("CustomTitleBar") {
             MyGui.Opt("-Caption")
             titlebar := %"CustomTitleBar"%.Attach(MyGui, {
@@ -333,6 +327,12 @@ class AutoUpdater {
             })
             offset := 50
             DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", MyGui.Hwnd, "UInt", 33, "Int*", 2, "UInt", 4)
+        }
+
+        UseAcrylicGUI := false
+        if IsFunctionDefined("FrostedTheme") {
+            UseAcrylicGUI := true
+            offset := 50
         }
 
         TextNormalColor := "CCCCCC"
