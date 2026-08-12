@@ -110,10 +110,8 @@ ShowAboutGUI() {
         if IsFunctionDefined("FrostedTheme")
             %"FrostedTheme"%.Apply(MyGui)
     } else {
-		if IsFunctionDefined("ApplyThemeToGui") {
-			%"ApplyThemeToGui"%(MyGui)
-			"%WatchedGUIs%".Push(MyGui)
-		}
+        ApplyThemeToGui(MyGui)
+        WatchedGUIs.Push(MyGui)
     }
 
     MyGui.Show()

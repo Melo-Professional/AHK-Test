@@ -1,8 +1,8 @@
 /************************************************************************
  * @description Autod Updater
  * @author Melo (melo@meloprofessional.com)
- * @date 2026/08/10
- * @version 1.5.0
+ * @date 2026/08/12
+ * @version 1.5.100
  ************************************************************************/
 
 #Requires AutoHotkey v2.0
@@ -279,9 +279,9 @@ class AutoUpdater {
 
         ; 3. Launch new process passing clean arguments
         if A_IsCompiled {
-            psCmd .= 'if (Test-Path -LiteralPath \"' . newTargetPath . '\") { Start-Process -FilePath \"' . newTargetPath . '\" -ArgumentList \"--signal-update-success=' . signalArg . '\" }; '
+            psCmd .= 'if (Test-Path -LiteralPath \"' . newTargetPath . '\") { Start-Process -FilePath \"' . newTargetPath . '\" -ArgumentList \"\`\"--signal-update-success=' . signalArg . '\`\"\" }; '
         } else {
-            psCmd .= 'if (Test-Path -LiteralPath \"' . newTargetPath . '\") { Start-Process -FilePath \"' . A_AhkPath . '\" -ArgumentList \"\`\"' . newTargetPath . '\`\"\", \"--signal-update-success=' . signalArg . '\" }; '
+            psCmd .= 'if (Test-Path -LiteralPath \"' . newTargetPath . '\") { Start-Process -FilePath \"' . A_AhkPath . '\" -ArgumentList \"\`\"' . newTargetPath . '\`\"\", \"\`\"--signal-update-success=' . signalArg . '\`\"\" }; '
         }
 
         ; 4. Monitor health check for up to 10 seconds
