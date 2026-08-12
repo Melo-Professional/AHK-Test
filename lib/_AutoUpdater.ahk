@@ -183,6 +183,9 @@ class AutoUpdater {
         if (Type(SaveINI) == "Func" || Type(SaveINI) == "Closure")
             SaveINI()
 
+        ; Helper function for PowerShell single-quoted literal escaping
+        ps_str(str) => "'" . StrReplace(str, "'", "''") . "'"
+
         isZip := RegExMatch(this.DownloadUrl, "i)\.zip(\?|$)") || RegExMatch(this.DownloadUrl, "i)/zipball/")
         
         urlExt := A_IsCompiled ? ".exe" : ".ahk"
@@ -191,9 +194,12 @@ class AutoUpdater {
         }
         
         targetFile := A_ScriptFullPath
-        targetDir := A_ScriptDir
+        SplitPath(targetFile, &targetName, &targetDir, &targetExt, &targetNameNoExt)
         
-        Global updatesDir := targetDir . "\." . A_ScriptName . "_updates"
+        ; Sanitize script name for safe file/folder naming (replaces spaces/special chars with underscores)
+        cleanName := RegExReplace(targetNameNoExt, "[^\w\-]", "_")
+        
+        Global updatesDir := targetDir . "\." . cleanName . "_updates"
         
         if !DirExist(updatesDir)
             DirCreate(updatesDir)
@@ -228,7 +234,7 @@ class AutoUpdater {
             
             psUnzip := 'powershell -NoProfile -WindowStyle Hidden -Command "'
             psUnzip .= 'Add-Type -AssemblyName System.IO.Compression.FileSystem; '
-            psUnzip .= '[System.IO.Compression.ZipFile]::ExtractToDirectory(\"' . dlFile . '\", \"' . extractDir . '\")"'
+            psUnzip .= '[System.IO.Compression.ZipFile]::ExtractToDirectory(' . ps_str(dlFile) . ', ' . ps_str(extractDir) . ')"'
             
             RunWait(psUnzip, , "Hide")
             
@@ -257,14 +263,10 @@ class AutoUpdater {
             payloadFile := dlFile
         }
 
-		ps_str(str) => "'" . StrReplace(str, "'", "''") . "'"
-
         Global signalFile := updatesDir . "\ahk_upd_ok.tmp"
         
         newTargetPath := targetFile
-        
-        SplitPath(targetFile, &targetName, &targetDir, &targetExt, &targetNameNoExt)
-        backupFileName := targetNameNoExt . "_v" . this.App.Version . "." . targetExt . ".bak"
+        backupFileName := cleanName . "_v" . this.App.Version . "." . targetExt . ".bak"
         Global backupFilePath := targetDir . "\" . backupFileName
 
         signalArg := signalFile . "|" . backupFilePath . "|" . updatesDir
@@ -279,11 +281,11 @@ class AutoUpdater {
         ; 2. Install new binary directly over target path
         psCmd .= 'Copy-Item -LiteralPath ' . ps_str(payloadFile) . ' -Destination ' . ps_str(newTargetPath) . ' -Force; '
 
-        ; 3. Launch new process passing clean arguments
+        ; 3. Launch new process passing clean arguments with embedded double quotes
         if A_IsCompiled {
-            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(newTargetPath) . ' -ArgumentList ' . ps_str('--signal-update-success=' . signalArg) . ' }; '
+            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(newTargetPath) . ' -ArgumentList ' . ps_str('"' . '--signal-update-success=' . signalArg . '"') . ' }; '
         } else {
-            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(A_AhkPath) . ' -ArgumentList @(' . ps_str(newTargetPath) . ', ' . ps_str('--signal-update-success=' . signalArg) . ') }; '
+            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(A_AhkPath) . ' -ArgumentList @(' . ps_str('"' . newTargetPath . '"') . ', ' . ps_str('"' . '--signal-update-success=' . signalArg . '"') . ') }; '
         }
 
         ; 4. Monitor health check for up to 10 seconds
