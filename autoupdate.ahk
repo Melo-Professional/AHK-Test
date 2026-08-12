@@ -3,14 +3,14 @@
 /************************************************************************
  * @description This is an auto updater for projects.
  * @author Melo (melo@meloprofessional.com)
- * @date 2026/08/08
+ * @date 2026/08/12
  * @releasedate 2026/04/24
- * @version 2.0.0.100
+ * @version 2.0.0.101
  ***********************************************************************/
 
 AppName := "Auto Updater"
 ;@Ahk2Exe-Let U_AppName = %A_PriorLine%
-AppVersion := "2.0.0.100"
+AppVersion := "2.0.0.101"
 ;@Ahk2Exe-Let U_Version = %A_PriorLine%
 AppDescription := "This is an auto updater for projects."
 ;@endregion
