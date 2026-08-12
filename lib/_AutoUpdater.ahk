@@ -257,7 +257,7 @@ class AutoUpdater {
             payloadFile := dlFile
         }
 
-		q(str) => '"' . str . '"'
+		ps_str(str) => "'" . StrReplace(str, "'", "''") . "'"
 
         Global signalFile := updatesDir . "\ahk_upd_ok.tmp"
         
@@ -274,26 +274,26 @@ class AutoUpdater {
         psCmd .= 'Start-Sleep -Seconds 2; '
         
         ; 1. Rename existing executable to backup
-        psCmd .= 'Rename-Item -LiteralPath ' . q(targetFile) . ' -NewName ' . q(backupFileName) . ' -Force; '
+        psCmd .= 'Rename-Item -LiteralPath ' . ps_str(targetFile) . ' -NewName ' . ps_str(backupFileName) . ' -Force; '
 
         ; 2. Install new binary directly over target path
-        psCmd .= 'Copy-Item -LiteralPath ' . q(payloadFile) . ' -Destination ' . q(newTargetPath) . ' -Force; '
+        psCmd .= 'Copy-Item -LiteralPath ' . ps_str(payloadFile) . ' -Destination ' . ps_str(newTargetPath) . ' -Force; '
 
         ; 3. Launch new process passing clean arguments
         if A_IsCompiled {
-            psCmd .= 'if (Test-Path -LiteralPath ' . q(newTargetPath) . ') { Start-Process -FilePath ' . q(newTargetPath) . ' -ArgumentList ' . q('--signal-update-success=' . signalArg) . ' }; '
+            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(newTargetPath) . ' -ArgumentList ' . ps_str('--signal-update-success=' . signalArg) . ' }; '
         } else {
-            psCmd .= 'if (Test-Path -LiteralPath ' . q(newTargetPath) . ') { Start-Process -FilePath ' . q(A_AhkPath) . ' -ArgumentList "' . q(newTargetPath) . ' ' . q('--signal-update-success=' . signalArg) . '" }; '
+            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(A_AhkPath) . ' -ArgumentList @(' . ps_str(newTargetPath) . ', ' . ps_str('--signal-update-success=' . signalArg) . ') }; '
         }
 
         ; 4. Monitor health check for up to 10 seconds
         psCmd .= '$counter = 0; '
-        psCmd .= 'while (-not (Test-Path -LiteralPath ' . q(signalFile) . ') -and $counter -lt 10) { Start-Sleep -Seconds 1; $counter++ }; '
+        psCmd .= 'while (-not (Test-Path -LiteralPath ' . ps_str(signalFile) . ') -and $counter -lt 10) { Start-Sleep -Seconds 1; $counter++ }; '
         
-        psCmd .= 'if (Test-Path -LiteralPath ' . q(signalFile) . ') { '
+        psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(signalFile) . ') { '
         psCmd .= '  Start-Sleep -Milliseconds 500; '
-        psCmd .= '  $toDelete = Get-Content -LiteralPath ' . q(signalFile) . ' -ErrorAction SilentlyContinue; '
-        psCmd .= '  Remove-Item -LiteralPath ' . q(signalFile) . ' -Force -ErrorAction SilentlyContinue; '
+        psCmd .= '  $toDelete = Get-Content -LiteralPath ' . ps_str(signalFile) . ' -ErrorAction SilentlyContinue; '
+        psCmd .= '  Remove-Item -LiteralPath ' . ps_str(signalFile) . ' -Force -ErrorAction SilentlyContinue; '
         psCmd .= '  foreach ($item in $toDelete) { '
         psCmd .= '    if ($item -and (Test-Path -LiteralPath $item)) { '
         psCmd .= '      Remove-Item -LiteralPath $item -Recurse -Force -ErrorAction SilentlyContinue '
@@ -301,8 +301,8 @@ class AutoUpdater {
         psCmd .= '  } '
         psCmd .= '} else { '
         ; Restoration logic if health check fails
-        psCmd .= '  Remove-Item -LiteralPath ' . q(newTargetPath) . ' -Force -ErrorAction SilentlyContinue; '
-        psCmd .= '  Rename-Item -LiteralPath ' . q(backupFilePath) . ' -NewName ' . q(targetName) . ' -Force -ErrorAction SilentlyContinue; '
+        psCmd .= '  Remove-Item -LiteralPath ' . ps_str(newTargetPath) . ' -Force -ErrorAction SilentlyContinue; '
+        psCmd .= '  Rename-Item -LiteralPath ' . ps_str(backupFilePath) . ' -NewName ' . ps_str(targetName) . ' -Force -ErrorAction SilentlyContinue; '
         psCmd .= '}"'
 
         Run(psCmd, , "Hide")
