@@ -1,22 +1,14 @@
 /************************************************************************
  * @description Vars_Custom
  * @author Melo (melo@meloprofessional.com)
- * @date 2026/08/06
- * @version 1.3.0
+ * @date 2026/08/16
+ * @version 1.4.0
  ***********************************************************************/
 
 ;@region VARS
 ; CUSTOM VARIABLES
-App.Github := "https://github.com/Melo-Professional/AHK-Test/"
-if (App.HasOwnProp("Github")  && App.Github != "" && App.Github != "https://github.com/Melo-Professional/") {
-	App.UpdateAuto := true
-	App.UpdateFrequencyDays := 3
-	App.UpdateLastCheck := ""
-	SaveToINI.Push("App.UpdateAuto", "App.UpdateFrequencyDays", "App.UpdateLastCheck")
-	RegisterArrayItems(SaveToINI)
-	LoadINI()
-}
-
+App.GitHubRepo			:= "https://github.com/Melo-Professional/AHK-Test/"
+;App.NameCutted			:= "Template`nBigName"
 
 /*
 Global General := {
@@ -26,21 +18,22 @@ Global General := {
     gainStepsMax:               20
 }
 */
-
-;ResetSettings       := Settings.Clone()
-;ResetGeneral        := General.Clone()
-;ResetOSDSettings    := OSDSettings.Clone()
-
-;App.NameCutted := "Template`nBigName"
-;Settings.SplashScreen := "Icon"
-;Debug := true
+;ResetSettings			:= Settings.Clone()
+;ResetGeneral			:= General.Clone()
+;ResetOSDSettings		:= OSDSettings.Clone()
+;Settings.DesiredTheme	:= "Light"
+;Settings.SplashScreen	:= "Icon"
+;Debug					:= true
 ;@endregion
-
 
 ;@region INI
+SaveToINI := []
 ;SaveToINI.Push("Settings.SplashScreen")     ; add more to INI file
-;RegisterArrayItems(SaveToINI)
-;LoadINI()
-;@endregion
 
-;Settings.DesiredTheme := "Light"
+if App.HasOwnProp("GitHubRepo")
+	SaveToINI.Push("App.UpdateAuto", "App.UpdateFrequencyDays", "App.UpdateLastCheck")
+if (IsSet(INIManager) && (SaveToINI != [])) {
+	IsSet(RegisterArrayItems) ? RegisterArrayItems(SaveToINI) : 0
+	IsSet(LoadINI) ? LoadINI() : 0
+}
+;@endregion

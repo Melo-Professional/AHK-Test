@@ -1,8 +1,8 @@
 /************************************************************************
  * @description Menu Template
  * @author Melo (melo@meloprofessional.com)
- * @date 2026/08/06
- * @version 2.7.0
+ * @date 2026/08/25
+ * @version 2.9.0 ( Added Debug)
  ***********************************************************************/
 
 #Requires AutoHotkey v2.0
@@ -55,9 +55,15 @@ StartMenu() {
     MoreMenu.Add()
     MoreMenu.Add("Explore", (*) => Run('explorer.exe /select,"' . A_ScriptFullPath . '"'))
     
-    if !A_IsCompiled
+    if !A_IsCompiled {
         MoreMenu.Add("Edit", (*) => Run('explorer.exe /edit,"' . A_ScriptFullPath . '"'))
         ;MoreMenu.Add("Edit", (*) => Run '*edit "' . scriptPath . '"')
+
+        MoreMenu.Add("Debug", HandlerToggleDebug)
+		if isSet(Debug) && Debug {
+			MoreMenu.Check("Debug")
+		}
+	}
     
     ; 3. Check for Help GUI function
     if IsFunctionDefined("ShowHelpGUI") {
@@ -65,17 +71,23 @@ StartMenu() {
     }
     
     ; 3.1 Check for Updates
-    if IsSet(AutoUpdater) && App.HasOwnProp("Github") && App.Github != "" && App.Github != "https://github.com/Melo-Professional/" {
+    if IsSet(AutoUpdater) && App.HasOwnProp("GitHubRepo") {
         MoreMenu.Add("Update...", (*) => %"Updater"%.ShowUpdaterGUI())
     }
+    
 
     ; 4. Check for About GUI function
     if IsFunctionDefined("ShowAboutGUI") {
         MoreMenu.Add("About", (*) => %"ShowAboutGUI"%())
     }
+
     TrayMenu.Insert("Exit", "More", MoreMenu)
-    ;TrayMenu.Add("Restart", (*) => Reload())
-    TrayMenu.Insert("Exit", "Restart", (*) => ReloadClean())
+
+    if IsFunctionDefined("ReloadClean") {
+        TrayMenu.Insert("Exit", "Restart", (*) => %"ReloadClean"%())
+    } else {
+        TrayMenu.Insert("Exit", "Restart", (*) => Reload())
+	}
 
     SettingsLoadStartOnBoot(appName) ? MoreMenu.Check("Start on Boot") : ""
 
@@ -176,6 +188,13 @@ StartMenu() {
         MyMenu.ToggleCheck(ItemName)
     }
 
+	HandlerToggleDebug(ItemName, ItemPos, MyMenu) {
+		global Debug
+
+		Debug := !Debug
+		Debug ? MyMenu.Check(ItemName) : MyMenu.Uncheck(ItemName)
+	}
+
     ; --- FIRST RUN NOTIFICATION ---
     Global FirstRun := false
     RegKeyPath  := "HKCU\Software\" . appName
@@ -195,17 +214,4 @@ StartMenu() {
         TrayTip(App.Name " is now active and running in your system tray.", "Welcome!", "Mute " 36)
         Global FirstRun := true
     }
-}
-
-ReloadClean() {
-    if DllCall("userenv\CreateEnvironmentBlock", "Ptr*", &lpEnv:=0, "Ptr",0, "Int",0) {
-        si := Buffer(siSize := A_PtrSize == 8 ? 104 : 68, 0), NumPut("UInt", siSize, si)
-        pi := Buffer(A_PtrSize == 8 ? 24 : 16, 0)
-        cmd := A_IsCompiled ? '"' A_ScriptFullPath '" /force' : '"' A_AhkPath '" /force "' A_ScriptFullPath '"'
-
-        if DllCall("CreateProcessW", "Ptr",0, "Str",cmd, "Ptr",0, "Ptr",0, "Int",0, "UInt",0x400, "Ptr",lpEnv, "Ptr",0, "Ptr",si, "Ptr",pi)
-            ExitApp()
-        DllCall("userenv\DestroyEnvironmentBlock", "Ptr", lpEnv)
-    }
-    Reload()
 }

@@ -1,8 +1,8 @@
 /************************************************************************
  * @description Automatic Backup and Compilation Manager for AHK v2.
  * @author Melo (melo@meloprofessional.com) and Pj
- * @date 2026/07/30
- * @version 1.6.0
+ * @date 2026/08/26
+ * @version 1.8.0 (Backup \lib\subfolders if Included)
  * 
  * FEATURES:
  * - Creates an isolated '.versions\' directory automatically inside A_ScriptDir.
@@ -104,10 +104,7 @@ Backup() {
         }
     }
 
-    ToolTip("`n`n"
-        "          Backup starting          `n"
-        "          " scriptname " - " AppVersion "          `n`n"
-        " ",,,20)
+	Notify("🔴 Backup starting", true)
 
     ; -------------------------------------------------------------------
     ; Setup target paths
@@ -173,26 +170,38 @@ Backup() {
                 if RegExMatch(A_LoopField, "i)^\s*#Include\s+(?:\*i\s+)?<?([^>\s]+)>?", &match) {
                     includePath := match[1]
                     
-                    ; Append .ahk extension if omitted
-                    if !(includePath ~= "\.[a-zA-Z0-9]+$") {
-                        includePath .= ".ahk"
-                    }
-                    
                     ; Strip lead "lib\" or "lib/" if explicitly declared in the #Include
                     relLibPath := RegExReplace(includePath, "i)^lib[/\\]", "")
                     
-                    ; Resolve full path inside source lib folder
+                    ; Check if the #Include points directly to an entire subfolder
+                    sourceDir := A_ScriptDir "\lib\" relLibPath
+                    destDir   := targetDir "\lib\" relLibPath
+                    if DirExist(sourceDir) {
+                        DirCopy(sourceDir, destDir, 1)
+                        continue
+                    }
+
+                    ; If it's a file path, resolve its full extension
+                    if !(relLibPath ~= "\.[a-zA-Z0-9]+$") {
+                        relLibPath .= ".ahk"
+                    }
+
                     sourceFile := A_ScriptDir "\lib\" relLibPath
-                    
+                    destFile   := targetDir "\lib\" relLibPath
+
                     if FileExist(sourceFile) {
-                        destFile := targetDir "\lib\" relLibPath
-                        
-                        ; Ensure subfolders exist inside destination before copying
-                        SplitPath(destFile, , &destDir)
-                        if !DirExist(destDir)
-                            DirCreate(destDir)
-                            
-                        FileCopy(sourceFile, destFile, 1)
+                        ; If the file lives in a subfolder (e.g. WinRT\winrt.ahk), 
+                        ; copy the entire parent folder recursively.
+                        if InStr(relLibPath, "\") || InStr(relLibPath, "/") {
+                            parentSubFolder := RegExReplace(relLibPath, "[/\\].*$", "")
+                            DirCopy(A_ScriptDir "\lib\" parentSubFolder, targetDir "\lib\" parentSubFolder, 1)
+                        } else {
+                            ; Top-level lib file (e.g., lib\MyFunc.ahk)
+                            SplitPath(destFile, , &outDir)
+                            if !DirExist(outDir)
+                                DirCreate(outDir)
+                            FileCopy(sourceFile, destFile, 1)
+                        }
                     }
                 }
             }
@@ -255,10 +264,51 @@ Backup() {
             DirDelete(targetDir, 1)
         }
     }
-    
-    ToolTip("`n`n"
-        "          Backup created          `n"
-        "          " scriptname " - " AppVersion "          `n`n"
-        " ",,,20)
-    SetTimer(() => ToolTip(,,,20), -7000)
+
+	Notify("💾 Backup created")
+
+	Notify( msg, permanent := false) {
+		if IsFunctionDefined("OSDCustom") {
+			Static BackupOSD := %"OSDCustom"%()
+
+			if BackupOSD.IsVisible {
+				BackupOSD.UpdateTextObject( version, "v" Appversion)
+				BackupOSD.UpdateTextObject( wait, "done")
+				BackupOSD.UpdateTextObject( info, msg)
+				BackupOSD := 0
+				return
+			}
+
+			BackupOSD.FontSize			:= 14
+			BackupOSD.MarginX			:= 30
+			BackupOSD.MarginY			:= 30
+			BackupOSD.TimeOut			:= 7000
+			BackupOSD.Position			:= "x0.5 y0.83"
+
+			static info := BackupOSD.SetCellText( 1, 1, msg, "Center")
+			BackupOSD.SetCellText( 1, 3, scriptname, "Center", {FontSize: 10, FontColor: "CCCCCC", FontWeight: 100 })
+			static version := BackupOSD.SetCellText( 1, 4, " ", "Center", {FontSize: 12, FontColor: "CCCCCC", FontWeight: 100 })
+			static wait := BackupOSD.SetCellText( 1, 5, "wait...", "Right", {FontSize: 10, FontColor: "CCCCCC", FontWeight: 100 })
+			BackupOSD.Show()
+		} else {
+			if permanent {
+
+				ToolTip("`n`n"
+						"          " msg "          `n"
+						"          " scriptname " - " AppVersion "          `n`n"
+						" ",,,20)
+			} else {
+				ToolTip("`n`n"
+					"          " msg "          `n"
+					"          " scriptname " - " AppVersion "          `n`n"
+					" ",,,20)
+				SetTimer(() => ToolTip(,,,20), -7000)
+			}
+		}
+	}
+
+	IsFunctionDefined(FunctionName) {
+        try return HasMethod(%FunctionName%)
+        return false
+    }
 }

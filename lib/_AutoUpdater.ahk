@@ -1,8 +1,8 @@
 /************************************************************************
  * @description Autod Updater
  * @author Melo (melo@meloprofessional.com)
- * @date 2026/08/12
- * @version 1.5.100
+ * @date 2026/08/30
+ * @version 1.5.107 (Fixed path with spaces quote escaping)
  ************************************************************************/
 
 #Requires AutoHotkey v2.0
@@ -10,7 +10,7 @@
 StartAutoUpdater() {
     global FirstRun, Updater
 
-    if IsSet(AutoUpdater) && App.HasOwnProp("Github") && App.Github != "" && App.Github != "https://github.com/Melo-Professional/" {
+    if IsSet(AutoUpdater) && App.HasOwnProp("GitHubRepo") {
         if !IsSet(FirstRun) {
             FirstRun := false
         }
@@ -56,20 +56,18 @@ class AutoUpdater {
         if !this.App.HasOwnProp("UpdateLastCheck") || this.App.UpdateLastCheck == ""
             this.App.UpdateLastCheck := "1970-01-01"
 
-        if Debug {
-            tooltip("`n" . "has update auto: " this.App.HasOwnProp("UpdateAuto") .
-                    "`n" . "update auto: " this.App.UpdateAuto .
-                    "`n" . "has update frequency days: " this.App.HasOwnProp("UpdateFrequencyDays") .
-                    "`n" . "frequency days: " this.App.UpdateFrequencyDays .
-                    "`n" . "has update last check: " this.App.HasOwnProp("UpdateAuto") .
-                    "`n" . "last check: " this.App.UpdateLastCheck .
-                    "`n ."
-            )
-        }
+		_Debug("`n" . "has update auto: " this.App.HasOwnProp("UpdateAuto") .
+				"`n" . "update auto: " this.App.UpdateAuto .
+				"`n" . "has update frequency days: " this.App.HasOwnProp("UpdateFrequencyDays") .
+				"`n" . "frequency days: " this.App.UpdateFrequencyDays .
+				"`n" . "has update last check: " this.App.HasOwnProp("UpdateAuto") .
+				"`n" . "last check: " this.App.UpdateLastCheck .
+				"`n ."
+		)
     }
 
     CheckOnStartup(isFirstRun := false) {
-        if (!this.App.UpdateAuto || !this.App.HasOwnProp("Github") || this.App.Github == "")
+        if (!this.App.UpdateAuto || !this.App.HasOwnProp("GitHubRepo") || this.App.GitHubRepo == "")
             return
             
         lastCheck := StrReplace(this.App.UpdateLastCheck, "-", "") . "000000"
@@ -95,15 +93,15 @@ class AutoUpdater {
     }
 
     CheckForUpdates(silent := false) {
-        if (!this.App.HasOwnProp("Github") || this.App.Github == "") {
+        if (!this.App.HasOwnProp("GitHubRepo") || this.App.GitHubRepo == "") {
             if !silent
-                MsgBox("No GitHub repository specified for this app.", "Update Error", "48")
+                MsgBox("No GitHub repository specified for this app.", "Update Error", 0x40030)
             return false
         }
 
-        if !RegExMatch(this.App.Github, "github\.com/([^/]+)/([^/]+)", &m) {
+        if !RegExMatch(this.App.GitHubRepo, "github\.com/([^/]+)/([^/]+)", &m) {
             if !silent
-                MsgBox("Invalid GitHub URL format.", "Update Error", "48")
+                MsgBox("Invalid GitHub URL format.", "Update Error", 0x40030)
             return false
         }
         
@@ -141,11 +139,11 @@ class AutoUpdater {
             if (this.IsNewerVersion(this.App.Version, this.LatestVersion)) {
                 return true
             } else if !silent {
-                ; MsgBox("You are running the latest version (" . this.App.Version . ").", "Up to Date", "64")
+                ; MsgBox("You are running the latest version (" . this.App.Version . ").", "Up to Date", 0x40040)
             }
         } catch Error as err {
             if !silent
-                MsgBox("Failed to check for updates.`nError: " . err.Message, "Update Error", "48")
+                MsgBox("Failed to check for updates.`nError: " . err.Message, "Update Error", 0x40030)
         }
         return false
     }
@@ -173,15 +171,15 @@ class AutoUpdater {
     ApplyUpdate(silent := false) {
         if (this.DownloadUrl == "") {
             if !silent
-                MsgBox("No download URL found for this release on GitHub.", "Update Error", "48")
+                MsgBox("No download URL found for this release on GitHub.", "Update Error", 0x40030)
             return
         }
 
         this.App.UpdateLastCheck := FormatTime(A_Now, "yyyy-MM-dd")
         if (this.App.HasOwnProp("UpdateLastCheck"))
             App.UpdateLastCheck := this.App.UpdateLastCheck
-        if (Type(SaveINI) == "Func" || Type(SaveINI) == "Closure")
-            SaveINI()
+
+		IsSet(SaveINI) ? SaveINI() : 0
 
         ; Helper function for PowerShell single-quoted literal escaping
         ps_str(str) => "'" . StrReplace(str, "'", "''") . "'"
@@ -218,7 +216,7 @@ class AutoUpdater {
         } catch Error as err {
             if !silent {
                 ToolTip()
-                MsgBox("Failed to download update file.`n" . err.Message, "Download Failed", "48")
+                MsgBox("Failed to download update file.`n" . err.Message, "Download Failed", 0x40030)
             }
             return
         }
@@ -253,7 +251,7 @@ class AutoUpdater {
 
             if (extractedExePath == "") {
                 if !silent
-                    MsgBox("Failed to locate an updated ." . searchExt . " file inside the downloaded archive.", "Update Error", "48")
+                    MsgBox("Failed to locate an updated ." . searchExt . " file inside the downloaded archive.", "Update Error", 0x40030)
                 try DirDelete(extractDir, true)
                 return
             }
@@ -274,18 +272,24 @@ class AutoUpdater {
         ; --- SAFE POWERSHELL EXECUTION WITH HEALTH CHECK ---
         psCmd := 'powershell -NoProfile -WindowStyle Hidden -Command "'
         psCmd .= 'Start-Sleep -Seconds 2; '
-        
-        ; 1. Rename existing executable to backup
+
+		; 1. Rename existing executable to backup
         psCmd .= 'Rename-Item -LiteralPath ' . ps_str(targetFile) . ' -NewName ' . ps_str(backupFileName) . ' -Force; '
 
-        ; 2. Install new binary directly over target path
+        ; 2. Install new binary and associated assets directly over target path
+        if isZip {
+            SplitPath(payloadFile, , &payloadDir)
+            psCmd .= 'Copy-Item -Path (' . ps_str(payloadDir . "\*") . ') -Destination ' . ps_str(targetDir) . ' -Recurse -Force; '
+        }
+        
+        ; Explicitly overwrite the main executable to guarantee the script's original filename is preserved
         psCmd .= 'Copy-Item -LiteralPath ' . ps_str(payloadFile) . ' -Destination ' . ps_str(newTargetPath) . ' -Force; '
 
-        ; 3. Launch new process passing clean arguments with embedded double quotes
+        ; 3. Launch new process passing clean arguments with embedded double quotes escaped for Start-Process
         if A_IsCompiled {
-            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(newTargetPath) . ' -ArgumentList ' . ps_str('"' . '--signal-update-success=' . signalArg . '"') . ' }; '
+            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(newTargetPath) . ' -ArgumentList ' . ps_str('\"--signal-update-success=' . signalArg . '\"') . ' }; '
         } else {
-            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(A_AhkPath) . ' -ArgumentList @(' . ps_str('"' . newTargetPath . '"') . ', ' . ps_str('"' . '--signal-update-success=' . signalArg . '"') . ') }; '
+            psCmd .= 'if (Test-Path -LiteralPath ' . ps_str(newTargetPath) . ') { Start-Process -FilePath ' . ps_str(A_AhkPath) . ' -ArgumentList @(' . ps_str('\"' . newTargetPath . '\"') . ', ' . ps_str('\"--signal-update-success=' . signalArg . '\"') . ') }; '
         }
 
         ; 4. Monitor health check for up to 10 seconds
@@ -311,39 +315,51 @@ class AutoUpdater {
         ExitApp()
     }
 
-    ShowUpdaterGUI() {
+    ShowUpdaterGUI(*) {
+		static MyGui := ""
+		if MyGui
+			return WinActivate(MyGui)
+
         hasUpdate := (this.LatestVersion != "" && this.IsNewerVersion(this.App.Version, this.LatestVersion))
 
         MyGuiTitle := App.Name . " - Update"
-        MyGuiOptions := "+LastFound -MinimizeBox"
+        MyGuiOptions := "+LastFound -MinimizeBox +AlwaysOnTop"
         MyGui := Gui(MyGuiOptions, MyGuiTitle)
         MyGui.SetFont("s" Settings.GuiFontSizeMedium, Settings.GuiFontName)
-        offset := 10
+		DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", MyGui.Hwnd, "UInt", 33, "Int*", 2, "UInt", 4)
+        offset := 20
 
         if IsFunctionDefined("CustomTitleBar") {
             MyGui.Opt("-Caption")
             titlebar := %"CustomTitleBar"%.Attach(MyGui, {
                 Title: "",
                 ShowIcon: false,
-                Min: true,
+                Min: false,
                 Max: false,
                 Close: true
             })
             offset := 50
-            DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", MyGui.Hwnd, "UInt", 33, "Int*", 2, "UInt", 4)
         }
 
-        UseAcrylicGUI := false
-        if IsFunctionDefined("FrostedTheme") {
-            UseAcrylicGUI := true
-            offset := 50
-        }
+		if (UseAcrylicGUI := IsSet(FrostedTheme))
+			offset := 30
 
-        TextNormalColor := "CCCCCC"
-        TextHoverColor  := "FFFFFF"
-        BGroundNormalColor  := "1b1b1b"
-        BGroundHoverColor   := "313131"
-        isHovering := false
+		; Color Constants
+		TextNormalColor				:= Settings.Theme.%CurrentActualTheme%.TextSmooth
+		TextHoverColor				:= Settings.Theme.%CurrentActualTheme%.TextDefault
+		BGroundNormalColor			:= Settings.Theme.%CurrentActualTheme%.Bg
+		BGroundHoverColor			:= Settings.Theme.%CurrentActualTheme%.BgHover
+		GitNormalColor				:= "5865F2"
+		GitHoverColor				:= "5896f2"
+
+		if UseAcrylicGUI {
+			TextNormalColor			:= "CCCCCC"
+			TextHoverColor			:= "FFFFFF"
+			BGroundNormalColor		:= "1b1b1b"
+			BGroundHoverColor		:= "313131"
+			GitNormalColor			:= "5865F2"
+			GitHoverColor			:= "5896f2"
+		}
 
         GuiWidth            := 340
         BtnWidth            := 100
@@ -380,7 +396,7 @@ class AutoUpdater {
                 txtBannerSub.SetFont("s" Settings.GuiFontSizeBig " Norm", Settings.GuiFontName)
                 txtBannerSub.Value := "You are running the latest version."
             } else {
-                txtBannerTitle.SetFont("s" Settings.GuiFontSizeExtraBig " bold c0x8b8b8b", Settings.GuiFontName)
+                txtBannerTitle.SetFont("s" Settings.GuiFontSizeExtraBig " bold c" TextHoverColor, Settings.GuiFontName)
                 txtBannerTitle.Value := "Update Preferences"
                 txtBannerSub.SetFont("s" Settings.GuiFontSizeBig " Norm", Settings.GuiFontName)
                 txtBannerSub.Value := "Check and manage application updates."
@@ -407,13 +423,21 @@ class AutoUpdater {
 
         lblLastCheck := MyGui.AddText("x+10 w180", this.App.UpdateLastCheck)
 
-        MyGui.SetFont("s" Settings.GuiFontSizeMedium " Norm")
+		; GitHub Link
+        MyGui.SetFont("s" Settings.GuiFontSizeBig " c" GitNormalColor " w800")
+        MyLink := MyGui.Add("Text", "-Tabstop xm y+10", "View Release Notes on GitHub...")
+        MyLink.OnEvent("Click", (*) => Run(App.GitHubRepo . "/releases"))
+        MyLink.BypassTheme := true
+
+
+        MyGui.SetFont("s" Settings.GuiFontSizeMedium " Norm w100")
         chkAuto := MyGui.AddCheckbox("xm y+40 Checked" . (this.App.UpdateAuto ? "1" : "0"))
         MyGui.AddText("x+0", "Enable Automatic Updates")
         
         lblFreq := MyGui.AddText("xm y+12 h30 0x0200", "Check frequency (days)")
         MyGui.SetFont("s" Settings.GuiFontSizeExtraBig " Bold w800")
-        numFreq := MyGui.AddEdit("x+40 w60 h30 0x0200 Number Center", this.App.UpdateFrequencyDays)
+        numFreq := MyGui.AddEdit("x+40 w60 h30 c000000 0x0200 Number Center", this.App.UpdateFrequencyDays)
+		numFreq.BypassTheme := true
         updUpDown := MyGui.AddUpDown("Range1-90", this.App.UpdateFrequencyDays)
         MyGui.SetFont("s" Settings.GuiFontSizeMedium " Norm")
 
@@ -442,17 +466,30 @@ class AutoUpdater {
         MyGui.OnEvent("Close", CleanDestroy)
         MyGui.OnEvent("Escape", CleanDestroy)
 
-        if UseAcrylicGUI {
-            if IsFunctionDefined("ApplyThemeToGui")
-                %"ApplyThemeToGui"%(MyGui, "Dark")
-            if IsFunctionDefined("FrostedTheme")
-                %"FrostedTheme"%.Apply(MyGui)
-        } else {
-            if IsFunctionDefined("ApplyThemeToGui") {
-                %"ApplyThemeToGui"%(MyGui)
-                %"WatchedGUIs"%.Push(MyGui)
-            }
-        }
+		if IsSet(GuiTracker) {
+			tracker := GuiTracker()
+			tracker.AddGui := MyGui
+
+			tracker.RegisterControl(btnUpdate, Map(
+				"OnEnter", (ctrl) => (hasUpdate ? (ctrl.SetFont("c" TextHoverColor), ctrl.Opt("+Background" BGroundHoverColor)) : ""),
+				"OnLeave", (ctrl) => (hasUpdate ? (ctrl.SetFont("c" TextNormalColor), ctrl.Opt("+Background" BGroundNormalColor))  : "")
+			))
+
+			tracker.RegisterControl(MyLink, Map(
+				"OnEnter", (ctrl) => ctrl.SetFont("c" GitHoverColor),
+				"OnLeave", (ctrl) => ctrl.SetFont("c" GitNormalColor)
+			))
+		}
+
+		; Apply Themes
+		if UseAcrylicGUI {
+			IsSet(ApplyThemeToGui) ? ApplyThemeToGui(MyGui, "Dark") : 0
+			IsSet(FrostedTheme) ? FrostedTheme.Apply(MyGui) : 0
+			ApplyHDRFontQuality(MyGui)
+		} else {
+			IsSet(ApplyThemeToGui) ? ApplyThemeToGui(MyGui) : 0
+			IsSet(WatchedGUIs) ? WatchedGUIs.Push(MyGui) : 0
+		}
 
         MyGui.Show("w" GuiWidth)
         UpdateBannerUI()
@@ -467,80 +504,20 @@ class AutoUpdater {
             try btnUpdate.Enabled := hasUpdate
         }
 
-        if (App.Github || UseAcrylicGUI) {
-            if IsSet(MessageManager) {
-                MessageManager.Register(0x0200, OnMouseMoveMyGui)
-            } else {
-                OnMessage(0x0200, OnMouseMoveMyGui)
-            }
-        }
-
-        OnMouseMoveMyGui(wParam, lParam, msg, hwnd) {
-            try {
-                if (!btnUpdate)
-                    return
-            } catch {
-                return
-            }
-            
-            if (hwnd == btnUpdate.Hwnd) {
-                ctrl := GuiCtrlFromHwnd(hwnd)
-
-                if (!isHovering) {
-                        isHovering := true
-                        
-                        TRACKMOUSEEVENT := Buffer(A_PtrSize == 8 ? 24 : 16, 0)
-                        NumPut("UInt", TRACKMOUSEEVENT.Size, TRACKMOUSEEVENT, 0)
-                        NumPut("UInt", 2,                    TRACKMOUSEEVENT, 4)
-                        NumPut("Ptr",  ctrl.Hwnd,          TRACKMOUSEEVENT, A_PtrSize == 8 ? 8 : 8)
-                        DllCall("TrackMouseEvent", "Ptr", TRACKMOUSEEVENT)
-                        
-                        if IsSet(MessageManager) {
-                            MessageManager.Register(0x02A3, OnMouseLeaveMyGui)
-                        } else {
-                            OnMessage(0x02A3, OnMouseLeaveMyGui)
-                        }
-                }
-                if UseAcrylicGUI {
-                    ctrl.SetFont("c" TextHoverColor)
-                    ctrl.Opt("+Background" BGroundHoverColor)
-                }
-            }
-        }    
-
-        OnMouseLeaveMyGui(wParam, lParam, msg, hwnd) {
-            try {
-                if (hwnd == btnUpdate.Hwnd && UseAcrylicGUI) {
-                    ctrl := GuiCtrlFromHwnd(hwnd)
-                    ctrl.SetFont("c" TextNormalColor)
-                    ctrl.Opt("+Background" BGroundNormalColor)
-                    isHovering := false
-                }
-            }
-        }
-
         SaveValues(*) {
             this.App.UpdateAuto := (chkAuto.Value != 0)
             this.App.UpdateFrequencyDays := Integer(numFreq.Value)
             App.UpdateAuto := this.App.UpdateAuto
             App.UpdateFrequencyDays := this.App.UpdateFrequencyDays
             App.UpdateLastCheck := this.App.UpdateLastCheck
-            (Type(SaveINI) == "Func" || Type(SaveINI) == "Closure") ? SaveINI() : ""
+			IsSet(SaveINI) ? SaveINI() : 0
         }
 
         CleanDestroy(*) {
             SaveValues()
-            if IsSet(MessageManager) {
-                MessageManager.Unregister(0x0200, OnMouseMoveMyGui)
-                MessageManager.Unregister(0x02A3, OnMouseLeaveMyGui)
-            } else {
-                OnMessage(0x0200, OnMouseMoveMyGui, 0)
-                OnMessage(0x02A3, OnMouseLeaveMyGui, 0)
-            }
-            
-            if IsFunctionDefined("RemoveGuiFromArray")
-                %"RemoveGuiFromArray"%(MyGui)
+            IsSet(RemoveGuiFromArray) ? RemoveGuiFromArray(MyGui) : 0
             MyGui.Destroy()
+			MyGui := ""
         }
 
         IsFunctionDefined(Name) {

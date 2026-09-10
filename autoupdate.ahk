@@ -3,14 +3,14 @@
 /************************************************************************
  * @description This is an auto updater for projects.
  * @author Melo (melo@meloprofessional.com)
- * @date 2026/08/12
+ * @date 2026/09/10
  * @releasedate 2026/04/24
- * @version 2.0.0.108
+ * @version 2.0.0.111
  ***********************************************************************/
 
 AppName := "Auto Updater"
 ;@Ahk2Exe-Let U_AppName = %A_PriorLine%
-AppVersion := "2.0.0.108"
+AppVersion := "2.0.0.111"
 ;@Ahk2Exe-Let U_Version = %A_PriorLine%
 AppDescription := "This is an auto updater for projects."
 ;@endregion
@@ -36,13 +36,15 @@ A_MenuMaskKey := "vkFF"
 ;@region Includes
 #Include *i <_CompilerDirectives>
 #Include *i <_Backup>
-#Include *i <_Config&Vars>
-#Include *i <_MsgBoxCustom>
 #Include *i <_SaveSettings>
+#Include *i <_Config&Vars>
+#Include *i <_HelperFuncs>
 #Include *i <_MessageManager>
+;#Include *i <_TrayIconHandler>
 #Include *i <_Theme>
 #Include *i <_FrostedTheme>
 #Include *i <_TitleBar>
+;#Include *i <_GuiTracker>
 ;#Include *i <_ModernSlider>
 ;#Include *i <_Color_Picker_Dialog>
 ;#Include *i <_ReloadWithArgs>
@@ -62,30 +64,33 @@ A_MenuMaskKey := "vkFF"
 ;@endregion
 
 ;@region Startup
-; SPLASHSCREEN
-if (A_Args.Length == 0) && IsSet(SplashScreen){
-    SplashScreen()
+if !A_Args.Length {
+	if IsSet(SplashScreen) {
+	    SplashScreen()
+	} else if isSet(SplashScreenOSD) {
+		SplashScreenOSD()
+	}
 }
 
-; TRAY ICON + MENU
-StartMenu()
-Menu_Custom()
-if IsSet(StartAutoUpdater) {
-	%"StartAutoUpdater"%()
-}
-
-
+IsSet(StartMenu) ? StartMenu() : 0
+IsSet(Menu_Custom) ? Menu_Custom() : 0
+IsSet(StartAutoUpdater) ? StartAutoUpdater() : 0
 ;@endregion
 ;@endregion
 
 ;@region Main
 
+;@region Hotkeys
+#HotIf !A_IsCompiled
+^p::IsSet(ReloadClean) ? ReloadClean() : Reload()
+#HotIf
 ;@endregion
+
+
+
+;@endregion
+IsSet(CheckReloadArgs) ? CheckReloadArgs() : 0
+
 ;throw Error('Message', A_ThisFunc, )
 ;a := "test"
 ;OutputDebug(a) ; debug tab
-
-#HotIf !A_IsCompiled
-^p::ReloadClean()
-#HotIf
-
